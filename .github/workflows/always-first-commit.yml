@@ -1,0 +1,87 @@
+name: Always First Commit
+
+on:
+  workflow_call:
+    inputs:
+      save_artifact:
+        type: boolean
+        default: false
+      user_name:
+        type: string
+      user_email:
+        type: string
+      owner:
+        required: true
+        type: string
+      repo:
+        required: true
+        type: string
+      branch:
+        required: true
+        type: string
+      commit_message:
+        required: true
+        type: string
+      exclude_files:
+        type: string
+      exclude_folders:
+        type: string
+    secrets:
+      token:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  save-artifact:
+    if: ${{ inputs.save_artifact }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout the target repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.token }}
+          repository: ${{ inputs.repo }}
+          fetch-depth: 0
+      - name: upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ inputs.owner }}-${{ inputs.repo }}
+          path: ${{ inputs.repo }}
+  always-first-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.token }}
+          fetch-depth: 0
+      - name: set name and email
+        run: |
+          name=${{ inputs.user_name }}
+          email=${{ inputs.user_email }}
+          git config user.name "${name:-$(git log -n 1 --pretty=format:%an)}"
+          git config user.email "${email:-$(git log -n 1 --pretty=format:%ae)}"
+          echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      - name: create an orphan brach
+        run: |
+          git checkout --orphan ${{ env.sha }}
+      - name: exclude files
+        run: |
+          files='${{ inputs.exclude_files }}'
+          if [[ -n $files ]]
+          then
+            git rm --cached $files
+          fi
+      - name: exclude folders
+        run: |
+          folders='${{ inputs.exclude_folders }}'
+          if [[ -n $folders ]]
+          then
+            git rm --cached -rf $folders
+          fi
+      - name: push to the origin
+        run: |
+          git commit -m '${{ inputs.commit_message }}'
+          git remote add ${{ env.sha }} https://github.com/${{ inputs.owner }}/${{ inputs.repo }}.git
+          git push --force ${{ env.sha }} ${{ env.sha }}:${{ inputs.branch }}
