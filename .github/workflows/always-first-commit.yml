@@ -45,7 +45,7 @@ jobs:
           repository: ${{ inputs.repo }}
           fetch-depth: 0
       - name: upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.owner }}-${{ inputs.repo }}
           path: ${{ inputs.repo }}
